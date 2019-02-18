@@ -43,6 +43,13 @@ To give the model custom prompts, you can use:
 python3 src/interactive_conditional_samples.py --top_k 40
 ```
 
+## Running a flask server
+
+Install python package `flask` and run locally with:
+```
+FLASK_APP=src/flask_conditional_samples.py flask run -p 8000
+```
+
 ## Future work
 
 We may release code for evaluating the models on various benchmarks.

@@ -17,19 +17,12 @@ app = Flask(__name__)
 
 def init_model(
     model_name='117M',
-    seed=None,
     nsamples=1,
-    batch_size=None,
+    batch_size=1,
     length=None,
     temperature=1,
     top_k=0,
 ):
-    if batch_size is None:
-        batch_size = 1
-    assert nsamples % batch_size == 0
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
-
     enc = encoder.get_encoder(model_name)
     hparams = model.default_hparams()
     with open(os.path.join('models', model_name, 'hparams.json')) as f:
@@ -63,20 +56,25 @@ GENERATOR_MODEL = None
 
 @app.route('/', methods=('GET', 'POST'))
 def hello():
-    global GENERATOR_MODEL
-    if GENERATOR_MODEL is None:
-        GENERATOR_MODEL = init_model(top_k=40)
-    (enc, sess, output, context) = GENERATOR_MODEL
     prompt = ""
     texts = []
     samples = 3
     if request.method == 'POST':
-        prompt = request.form['prompt'] or "\n"
+        prompt = request.form['prompt'].strip()
         try:
             samples = int(request.form['samples'])
         except ValueError:
             pass
-        context_tokens = enc.encode(prompt)
+
+        global GENERATOR_MODEL
+        if GENERATOR_MODEL is None:
+            GENERATOR_MODEL = init_model(top_k=40)
+        (enc, sess, output, context) = GENERATOR_MODEL
+
+        if prompt:
+            context_tokens = enc.encode(prompt)
+        else:
+            context_tokens = [enc.encoder['<|endoftext|>']]
         for i in range(samples):
             out = sess.run(output, feed_dict={context: [context_tokens]})
             texts.append(enc.decode(out[0]))
