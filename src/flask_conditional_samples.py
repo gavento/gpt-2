@@ -53,6 +53,7 @@ def init_model(
 
 
 GENERATOR_MODEL = None
+CACHE_MODEL = False  # set to True to keep the model loaded
 
 @app.route('/', methods=('GET', 'POST'))
 def hello():
@@ -66,10 +67,13 @@ def hello():
         except ValueError:
             pass
 
-        global GENERATOR_MODEL
-        if GENERATOR_MODEL is None:
-            GENERATOR_MODEL = init_model(top_k=40)
-        (enc, sess, output, context) = GENERATOR_MODEL
+        if CACHE_MODEL:
+            global GENERATOR_MODEL
+            if GENERATOR_MODEL is None:
+                GENERATOR_MODEL = init_model()
+            (enc, sess, output, context) = GENERATOR_MODEL
+        else:
+            (enc, sess, output, context) = init_model()
 
         if prompt:
             context_tokens = enc.encode(prompt)
@@ -78,5 +82,8 @@ def hello():
         for i in range(samples):
             out = sess.run(output, feed_dict={context: [context_tokens]})
             texts.append(enc.decode(out[0]))
+
+        if not CACHE_MODEL:
+            sess.close()
 
     return render_template("page.html", prompt=prompt, texts=texts, samples=samples)
