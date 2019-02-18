@@ -1,0 +1,16 @@
+{% extends "base.jinja" %}
+{% block title %}GPT-2 generator{% endblock %}
+{% block content %}
+    <h1>GPT-2 generator (117M)</h1>
+    <form method="post">
+        <div class="form-group">
+            <legend for="prompt">Prompt</legend>
+            <textarea class="form-control" id="prompt" rows="6">{{ prompt }}</textarea>
+        </div>
+        <div class="form-group">
+            <input type="submit" value="Complete">
+        </div>
+    </form>
+    <legend>Generated text</legend>
+    <pre class="border">{{ text }}</pre>
+{% endblock %}
