@@ -8,28 +8,12 @@ import numpy as np
 import tensorflow as tf
 from flask import Flask, render_template, request
 
-#import encoder
-#import model
-#import sample
+import encoder
+import model
+import sample
 
 
 app = Flask(__name__)
-
-GENERATOR_MODEL = (None, None, None)
-
-@app.route('/', methods=('GET', 'POST'))
-def hello():
-    global GENERATOR_MODEL
-    (enc, sess, output) = GENERATOR_MODEL
-    prompt = ""
-    text = ""
-    if request.method == 'POST':
-        prompt = request.form['prompt']
-        context_tokens = enc.encode(prompt)
-        out = sess.run(output, feed_dict={context: [context_tokens]})
-        text = enc.decode(out[0])
-    return render_template("page.jinja", prompt=prompt, tex=text)
-
 
 def init_model(
     model_name='117M',
@@ -56,22 +40,45 @@ def init_model(
     elif length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
-    sess = tf.Session(graph=tf.Graph())
-    context = tf.placeholder(tf.int32, [batch_size, None])
-    output = sample.sample_sequence(
-        hparams=hparams, length=length,
-        context=context,
-        batch_size=batch_size,
-        temperature=temperature, top_k=top_k
-    )
+    graph = tf.Graph()
+    sess = tf.Session(graph=graph)
 
-    saver = tf.train.Saver()
-    ckpt = tf.train.latest_checkpoint(os.path.join('models', model_name))
-    saver.restore(sess, ckpt)
+    with sess.as_default(), graph.as_default():
+        context = tf.placeholder(tf.int32, [batch_size, None])
+        output = sample.sample_sequence(
+            hparams=hparams, length=length,
+            context=context,
+            batch_size=batch_size,
+            temperature=temperature, top_k=top_k
+        )
 
-    return (enc, sess, output)
+        saver = tf.train.Saver()
+        ckpt = tf.train.latest_checkpoint(os.path.join('models', model_name))
+        saver.restore(sess, ckpt)
+
+    return (enc, sess, output, context)
 
 
-if __name__ == '__main__':
-    GENERATOR_MODEL = init_model()
-    pass
+GENERATOR_MODEL = None
+
+@app.route('/', methods=('GET', 'POST'))
+def hello():
+    global GENERATOR_MODEL
+    if GENERATOR_MODEL is None:
+        GENERATOR_MODEL = init_model(top_k=40)
+    (enc, sess, output, context) = GENERATOR_MODEL
+    prompt = ""
+    texts = []
+    samples = 3
+    if request.method == 'POST':
+        prompt = request.form['prompt'] or "\n"
+        try:
+            samples = int(request.form['samples'])
+        except ValueError:
+            pass
+        context_tokens = enc.encode(prompt)
+        for i in range(samples):
+            out = sess.run(output, feed_dict={context: [context_tokens]})
+            texts.append(enc.decode(out[0]))
+
+    return render_template("page.html", prompt=prompt, texts=texts, samples=samples)
